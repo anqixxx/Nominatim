@@ -24,6 +24,7 @@ from .types import Point, Bbox, LookupDetails
 from .connection import SearchConnection
 from .logging import log
 from .localization import Locales
+from .transliterate import Transliterator
 
 # This file defines complex result data classes.
 
@@ -153,6 +154,48 @@ class AddressLines(List[AddressLine]):
         return label_parts
 
 
+    def transliterate(self, locales: Transliterator) -> str:
+        """ Based on Nominatim Localize and ISO regions
+            Assumes the user does not know the local language
+
+            Set the local name of address parts according to the chosen
+            local, transliterating if not avaliable.
+            Return the list of local names without duplicates.
+
+            Only address parts that are marked as isaddress are localized
+            and returned.
+        """
+        label_parts: List[str] = []
+        iso = False
+        local_name_lang = None
+
+        if not self:
+            return label_parts
+
+        local_languages = locales._get_languages(self)
+
+        if len(local_languages) == 1 and local_languages[0] in locales.languages:
+            iso = True
+            local_name_lang = local_languages[0] # can potentially do more with this
+
+        for line in self:
+            line.local_name_lang = local_name_lang
+
+            if line.isaddress and line.names:
+
+                if not iso:
+                    line.local_name, line.local_name_lang = locales.display_name_with_locale(line.names) # new identifier, local_name_lang
+
+                if not label_parts or label_parts[-1] != line.local_name:
+                    if iso or line.local_name_lang in locales.languages:
+                        print(f"no transliteration needed for {line.local_name}")
+                        label_parts.append(line.local_name)
+                    else:
+                        label_parts.append(locales._transliterate(line))
+
+        return label_parts
+       
+
 @dataclasses.dataclass
 class WordInfo:
     """ Each entry in the list of search terms contains the
@@ -239,6 +282,17 @@ class BaseResult:
         self.locale_name = locales.display_name(self.names)
         if self.address_rows:
             self.display_name = ', '.join(self.address_rows.localize(locales))
+        else:
+            self.display_name = self.locale_name
+
+
+    def transliterate(self, locales: Transliterator) -> None:
+        """ Fill the locale_name and transliterated_name field for the
+            place and, if available, its address information.
+        """
+        self.locale_name = locales.display_name(self.names)
+        if self.address_rows:
+            self.display_name = ', '.join(self.address_rows.transliterate(locales))
         else:
             self.display_name = self.locale_name
 
@@ -743,3 +797,4 @@ async def complete_parented_places(conn: SearchConnection, result: BaseResult) -
 
     for row in await conn.execute(sql):
         result.parented_rows.append(_result_row_to_address_row(row))
+

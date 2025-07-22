@@ -23,6 +23,7 @@ from ..types import DataLayer, GeometryFormat, PlaceRef, PlaceID, OsmID, Point
 from ..status import StatusResult
 from ..results import DetailedResult, ReverseResults, SearchResult, SearchResults
 from ..localization import Locales
+from ..transliterate import Transliterator
 from . import helpers
 from ..server import content_types as ct
 from ..server.asgi_adaptor import ASGIAdaptor, EndpointFunc
@@ -156,7 +157,7 @@ async def details_endpoint(api: NominatimAPIAsync, params: ASGIAdaptor) -> Any:
 
     debug = setup_debugging(params)
 
-    locales = Locales.from_accept_languages(get_accepted_languages(params))
+    locales = Locales.from_accept_languages(get_accepted_languages(params)) # no simple identifier, not quite sure how to integrate
 
     result = await api.details(place,
                                address_details=params.get_bool('addressdetails', False),
