@@ -12,7 +12,7 @@ from binascii import hexlify
 
 import pytest
 
-from nominatim_api import SourceTable, DetailedResult, Point
+from nominatim_api import SourceTable, DetailedResult, Point, AddressLines, AddressLine, Transliterator
 import nominatim_api.results as nresults
 
 
@@ -83,3 +83,51 @@ def test_create_row_without_housenumber(func):
     assert res.housenumber is None
     assert res.extratags == {'startnumber': '1', 'endnumber': '11', 'step': '2'}
     assert res.category == ('place', 'houses')
+
+
+def test_transliterate():
+    address_lines = AddressLines([
+        AddressLine(
+            isaddress=True,
+            rank_address=10,
+            distance=0.0,
+            place_id=1,
+            osm_object=('N', 123),
+            extratags=None,
+            admin_level=None,
+            local_name="丹东第一中学",
+            transliterated_name=None,
+            local_name_lang="zh-Hans",
+            category=('amenity', 'school'),
+            names={'name': '丹东第一中学'},
+            fromarea=False
+        ),
+        AddressLine(
+            isaddress=True,
+            rank_address=20,
+            distance=0.0,
+            place_id=2,
+            osm_object=('N', 456),
+            extratags=None,
+            admin_level=None,
+            local_name="丹东实验小学",
+            transliterated_name=None,
+            local_name_lang="zh-Hans",
+            category=('amenity', 'school'),
+            names={'name': '丹东第二中学'},
+            fromarea=False
+        )
+    ])
+
+    result = DetailedResult(
+        source_table=SourceTable.PLACEX,
+        category=('amenity', 'school'),
+        centroid=Point(0.0, 0.0),
+        names={'name': '丹东'},
+        address_rows=address_lines,
+        country_code="cn"
+    )
+    transliterator = Transliterator.from_accept_languages("en-US")
+    result.transliterate(transliterator)
+
+    assert result.transliterated_name == "Dan Dong Di Yi Zhong Xue , Dan Dong Di Er Zhong Xue"

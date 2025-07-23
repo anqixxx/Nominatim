@@ -49,10 +49,13 @@ class Transliterator(Locales, ABC):
 
             Special handling is needed for Macau and Hong Kong (not in yaml)
         """
+        print("RESULT")
+        print(result)
+        print(type(result))
         if not self.country_data:
             self.country_data = load_country_info()
-
-        country = self.country_data.get(result.country_code.lower())
+        print(result)
+        country = self.country_data.get(result.country_code.lower()) 
         if country and 'languages' in country:
             return [lang.strip() for lang in country['languages'].split(',')]
         return []
@@ -189,76 +192,6 @@ class Transliterator(Locales, ABC):
         return self.display_name_with_locale(names)[0]
 
 
-    def _transliterate(self, line: napi.AddressLine, in_cantonese: bool = False):
-        """ Most granular transliteration component
-            Performs raw transliteration based on locales
-
-            Defaults to Latin
-        """
-        # in_cantonese is a placeholder for now until we determine HK and Macau mapping
-
-        for locale in self.languages:
-            # Need to replace to be a valid function
-            _function = f"{locale.replace('-', '_')}_transliterate"
-            if _function in globals():
-                print(f"{locale} transliteration successful")
-                return globals()[_function](line)
-            elif self._latin(locale):
-                print("latin based language detected, latin transliteration occuring")
-                if not in_cantonese:
-                    return unidecode(line.local_name)
-                else:
-                    return decode_canto(line.local_name)
-        
-        print("defaulting to latin based transliteration")
-        if not in_cantonese:
-            return unidecode(line.local_name)
-        else:
-            return decode_canto(line.local_name)
-
-
-    def transliterate(self, result) -> str:
-        """ Based on Nominatim Localize and ISO regions
-            Assumes the user does not know the local language
-
-            Set the local name of address parts according to the chosen
-            local, transliterating if not avaliable.
-            Return the list of local names without duplicates.
-
-            Only address parts that are marked as isaddress are localized
-            and returned.
-        """
-        label_parts: List[str] = []
-        iso = False
-        local_name_lang = None
-
-        if not result.address_rows:
-            return label_parts
-
-        local_languages = self._get_languages(result)
-
-        if len(local_languages) == 1 and local_languages[0] in self.languages:
-            iso = True
-            local_name_lang = local_languages[0] # can potentially do more with this
-
-        for line in result.address_rows:
-            line.local_name_lang = local_name_lang
-
-            if line.isaddress and line.names:
-
-                if not iso:
-                    line.local_name, line.local_name_lang = self.display_name_with_locale(line.names) # new identifier, local_name_lang
-
-                if not label_parts or label_parts[-1] != line.local_name:
-                    if iso or line.local_name_lang in self.languages:
-                        print(f"no transliteration needed for {line.local_name}")
-                        label_parts.append(line.local_name)
-                    else:
-                        label_parts.append(self._transliterate(line))
-
-        return ", ".join(part.strip() for part in label_parts)
-
-
 def include_constructor(loader, node):
     # Temporary file to get rid of !include error for yaml
 
@@ -296,70 +229,16 @@ def load_lang_info(yaml_path=None):
         return yaml.safe_load(file)
 
 
-def decode_canto(line: str) -> str:
-    """ Takes in a string in Cantonese and returns the Latin
-        transliterated version. 
-        Uses the cantoroman library, named as so to be homogenous
-        with unidecode
-
-        For cases with multiple pronounciation, the first is always taken
-    """
-    cantonese = Cantonese() # perhaps make into global variable later
-    cantonese_line = ""
-    for char in line:
-        cantonese_line += cantonese.getRoman(char)[0][0].capitalize()
-        cantonese_line += ' '
-    return cantonese_line.strip()
-
-
-def zh_Hans_transliterate(line: napi.AddressLine):
-    """ If in Traditional Chinese, convert to Simplified
-        NOT TESTED, PROOF OF CONCEPT
-
-        Else switch to standard Latin default transliteration
-    """
-    if line.local_name_lang == 'zh-hant':
-        converter = opencc.OpenCC('t2s.json') # t2s.json Traditional Chinese to Simplified Chinese 繁體到簡體
-        return converter.convert(line.local_name)
-    return unidecode(line.local_name)
-
-
-def zh_Hant_transliterate(line: napi.AddressLine):
-    """ If in Simplified Chinese, convert to Traditional
-
-        Else switch to standard Latin default transliteration
-    """
-    if line.local_name_lang == 'zh-hans' or line.local_name_lang == 'zh-CN': # also need a way to know it its in chinese or not
-        converter = opencc.OpenCC('s2t.json') # t2s.json Traditional Chinese to Simplified Chinese 繁體到簡體
-        return converter.convert(line.local_name)
-    return unidecode(line.local_name)
-
-
-def yue_transliterate(line: napi.AddressLine):
-    """ If in Simplified Chinese, convert to Traditional
-
-        Else switch to standard Latin default transliteration
-    """
-    if line.local_name_lang == 'zh-hans' or line.local_name_lang == 'zh':
-        converter = opencc.OpenCC('s2t.json') # t2s.json Traditional Chinese to Simplified Chinese 繁體到簡體
-        return converter.convert(line.local_name)
-    return unidecode(line.local_name)
-
-
 async def search(query):
     """ Nominatim Search Query
     """
-    async with napi.NominatimAPIAsync() as api:
-        return await api.search(query, address_details=True)
+    # async with napi.NominatimAPIAsync() as api:
+    #     return await api.search(query, address_details=True)
         # return await api.search(query)
+    pass
 
 
 # header = "zh-CN,zh;q=0.8,en-US;q=0.5"
 header = "fr,en-US;q=0.5"
 t = Transliterator.from_accept_languages(header)
 print(t.languages)
-variable = 'hospital in dandong'
-# variable = 'school in dandong'
-results = asyncio.run(search(f"{variable}"))
-o = t.transliterate(results[0])
-print(o)

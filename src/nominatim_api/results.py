@@ -15,6 +15,9 @@ from typing import Optional, Tuple, Dict, Sequence, TypeVar, Type, List, cast, C
 import enum
 import dataclasses
 import datetime as dt
+from unidecode import unidecode
+from cantoroman import Cantonese # only works from cantonese (written zh-Hant script) to latin
+import opencc
 
 import sqlalchemy as sa
 
@@ -131,6 +134,13 @@ class AddressLine:
         [Localization](Result-Handling.md#localization) below.
     """
 
+    transliterated_name: Optional[str] = None
+    """ Place holder for transliteration of this address part. 
+    """
+
+    local_name_lang: Optional[str] = None
+    """ Place holder for local name language of this address part. 
+    """
 
 class AddressLines(List[AddressLine]):
     """ Sequence of address lines order in descending order by their rank.
@@ -154,7 +164,7 @@ class AddressLines(List[AddressLine]):
         return label_parts
 
 
-    def transliterate(self, locales: Transliterator) -> str:
+    def transliterate(self, locales: Transliterator,  result) -> str:
         """ Based on Nominatim Localize and ISO regions
             Assumes the user does not know the local language
 
@@ -167,22 +177,18 @@ class AddressLines(List[AddressLine]):
         """
         label_parts: List[str] = []
         iso = False
-        local_name_lang = None
-
+        
         if not self:
             return label_parts
 
-        local_languages = locales._get_languages(self)
+        local_languages = locales._get_languages(result)
 
         if len(local_languages) == 1 and local_languages[0] in locales.languages:
             iso = True
-            local_name_lang = local_languages[0] # can potentially do more with this
+            line.local_name_lang = local_languages[0] # can potentially do more with this
 
         for line in self:
-            line.local_name_lang = local_name_lang
-
             if line.isaddress and line.names:
-
                 if not iso:
                     line.local_name, line.local_name_lang = locales.display_name_with_locale(line.names) # new identifier, local_name_lang
 
@@ -191,10 +197,86 @@ class AddressLines(List[AddressLine]):
                         print(f"no transliteration needed for {line.local_name}")
                         label_parts.append(line.local_name)
                     else:
-                        label_parts.append(locales._transliterate(line))
-
+                        label_parts.append(self._transliterate(line, locales))
         return label_parts
        
+
+    def _transliterate(self, line: AddressLine, locales: Transliterator, in_cantonese: bool = False):
+        """ Most granular transliteration component
+            Performs raw transliteration based on locales
+
+            Defaults to Latin
+        """
+        # in_cantonese is a placeholder for now until we determine HK and Macau mapping
+        for locale in locales.languages:
+            # Need to replace to be a valid function
+            _function = f"{locale.replace('-', '_')}_transliterate"
+            if _function in globals():
+                print(f"{locale} transliteration successful")
+                return globals()[_function](line) # improper code, need to fix later
+            elif locales._latin(locale):
+                print("latin based language detected, latin transliteration occuring")
+                if not in_cantonese:
+                    return unidecode(line.local_name)
+                else:
+                    return self.decode_canto(line.local_name)
+        
+        print("defaulting to latin based transliteration")
+        if not in_cantonese:
+            return unidecode(line.local_name)
+        else:
+            return self.decode_canto(line.local_name)
+
+
+    def decode_canto(self, line: str) -> str:
+        """ Takes in a string in Cantonese and returns the Latin
+            transliterated version. 
+            Uses the cantoroman library, named as so to be homogenous
+            with unidecode
+
+            For cases with multiple pronounciation, the first is always taken
+        """
+        cantonese = Cantonese() # perhaps make into global variable later
+        cantonese_line = ""
+        for char in line:
+            cantonese_line += cantonese.getRoman(char)[0][0].capitalize()
+            cantonese_line += ' '
+        return cantonese_line.strip()
+
+
+    def zh_Hans_transliterate(self):
+        """ If in Traditional Chinese, convert to Simplified
+            NOT TESTED, PROOF OF CONCEPT
+
+            Else switch to standard Latin default transliteration
+        """
+        if self.local_name_lang == 'zh-hant':
+            converter = opencc.OpenCC('t2s.json') # t2s.json Traditional Chinese to Simplified Chinese 繁體到簡體
+            return converter.convert(self.local_name)
+        return unidecode(self.local_name)
+
+
+    def zh_Hant_transliterate(self):
+        """ If in Simplified Chinese, convert to Traditional
+
+            Else switch to standard Latin default transliteration
+        """
+        if self.local_name_lang == 'zh-hans' or self.local_name_lang == 'zh-CN': # also need a way to know it its in chinese or not
+            converter = opencc.OpenCC('s2t.json') # t2s.json Traditional Chinese to Simplified Chinese 繁體到簡體
+            return converter.convert(self.local_name)
+        return unidecode(self.local_name)
+
+
+    def yue_transliterate(self):
+        """ If in Simplified Chinese, convert to Traditional
+
+            Else switch to standard Latin default transliteration
+        """
+        if self.local_name_lang == 'zh-hans' or self.local_name_lang == 'zh':
+            converter = opencc.OpenCC('s2t.json') # t2s.json Traditional Chinese to Simplified Chinese 繁體到簡體
+            return converter.convert(self.local_name)
+        return unidecode(self.local_name)
+
 
 @dataclasses.dataclass
 class WordInfo:
@@ -291,10 +373,13 @@ class BaseResult:
             place and, if available, its address information.
         """
         self.locale_name = locales.display_name(self.names)
+        print(self.address_rows)
         if self.address_rows:
-            self.display_name = ', '.join(self.address_rows.transliterate(locales))
+            print("here")
+            self.transliterated_name = ', '.join(self.address_rows.transliterate(locales, result=self)).strip()
         else:
-            self.display_name = self.locale_name
+            print("bad")
+            self.transliterated_name = self.locale_name
 
 
 BaseResultT = TypeVar('BaseResultT', bound=BaseResult)
