@@ -315,6 +315,7 @@ class BaseResult:
 
     locale_name: Optional[str] = None
     display_name: Optional[str] = None
+    transliterated_name: Optional[str] = None
 
     names: Optional[Dict[str, str]] = None
     address: Optional[Dict[str, str]] = None

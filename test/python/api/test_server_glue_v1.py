@@ -548,6 +548,7 @@ def test_get_locales_simple():
     assert isinstance(locales, Locales)
     assert locales.languages == ["en", "fr"]
 
+
 def test_get_locales_complex():
     """Test that get_locales returns Transliterator when use_complex is True."""
     accepted_languages = "en,fr"
@@ -563,6 +564,7 @@ def test_get_locales_simple_dialect():
     assert isinstance(locales, Locales)
     print(locales.languages)
     assert locales.languages == ["zh", "fr"]
+
 
 def test_get_locales_complex_dialect():
     """Test that get_locales returns Transliterator when use_complex is True."""

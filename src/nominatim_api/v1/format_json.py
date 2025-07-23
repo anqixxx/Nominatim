@@ -95,7 +95,8 @@ def format_base_json(results: Union[ReverseResults, SearchResults],
                                                    result.rank_address,
                                                    result.country_code))\
            .keyval('name', result.locale_name or '')\
-           .keyval('display_name', result.display_name or '')
+           .keyval('display_name', result.display_name or '')\
+           .keyval('transliterated_name', result.transliterated_name or '')
 
         if options.get('icon_base_url', None):
             icon = cl.ICONS.get(result.category)
@@ -173,7 +174,8 @@ def format_base_geojson(results: Union[ReverseResults, SearchResults],
                                                    result.rank_address,
                                                    result.country_code))\
            .keyval('name', result.locale_name or '')\
-           .keyval('display_name', result.display_name or '')
+           .keyval('display_name', result.display_name or '')\
+           .keyval('transliterated_name', result.transliterated_name or '')
 
         if options.get('addressdetails', False):
             out.key('address').start_object()
@@ -238,6 +240,7 @@ def format_base_geocodejson(results: Union[ReverseResults, SearchResults],
            .keyval_not_none('accuracy', getattr(result, 'distance', None), transform=int)\
            .keyval('label', result.display_name or '')\
            .keyval_not_none('name', result.locale_name or None)\
+           .keyval('transliterated_name', result.transliterated_name or '')
 
         if options.get('addressdetails', False):
             _write_geocodejson_address(out, result.address_rows, result.place_id,
