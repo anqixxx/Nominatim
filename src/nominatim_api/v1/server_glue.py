@@ -125,6 +125,13 @@ def parse_geometry_details(adaptor: ASGIAdaptor, fmt: str) -> Dict[str, Any]:
             }
 
 
+def get_locales(accepted_languages: str, use_complex: bool = False):
+    """ Return the appropriate localization class based on the configuration. """
+    if use_complex:
+        return Transliterator.from_accept_languages(accepted_languages)
+    return Locales.from_accept_languages(accepted_languages)
+
+
 async def status_endpoint(api: NominatimAPIAsync, params: ASGIAdaptor) -> Any:
     """ Server glue for /status endpoint. See API docs for details.
     """
@@ -157,7 +164,7 @@ async def details_endpoint(api: NominatimAPIAsync, params: ASGIAdaptor) -> Any:
 
     debug = setup_debugging(params)
 
-    locales = Locales.from_accept_languages(get_accepted_languages(params)) # no simple identifier, not quite sure how to integrate
+    locales = get_locales(get_accepted_languages(params)) # no simple identifier, not quite sure how to integrate
 
     result = await api.details(place,
                                address_details=params.get_bool('addressdetails', False),
@@ -195,7 +202,7 @@ async def reverse_endpoint(api: NominatimAPIAsync, params: ASGIAdaptor) -> Any:
     details = parse_geometry_details(params, fmt)
     details['max_rank'] = helpers.zoom_to_rank(params.get_int('zoom', 18))
     details['layers'] = get_layers(params)
-    details['locales'] = Locales.from_accept_languages(get_accepted_languages(params))
+    details['locales'] = get_locales(get_accepted_languages(params))
 
     result = await api.reverse(coord, **details)
 
@@ -228,7 +235,7 @@ async def lookup_endpoint(api: NominatimAPIAsync, params: ASGIAdaptor) -> Any:
     fmt = parse_format(params, SearchResults, 'xml')
     debug = setup_debugging(params)
     details = parse_geometry_details(params, fmt)
-    details['locales'] = Locales.from_accept_languages(get_accepted_languages(params))
+    details['locales'] = get_locales((get_accepted_languages(params)))
 
     places = []
     for oid in (params.get('osm_ids') or '').split(','):
@@ -311,7 +318,7 @@ async def search_endpoint(api: NominatimAPIAsync, params: ASGIAdaptor) -> Any:
     else:
         details['layers'] = get_layers(params)
 
-    details['locales'] = Locales.from_accept_languages(get_accepted_languages(params))
+    details['locales'] = get_locales(get_accepted_languages(params))
 
     # unstructured query parameters
     query = params.get('q', None)

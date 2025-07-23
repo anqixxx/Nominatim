@@ -18,6 +18,9 @@ import nominatim_api.v1.server_glue as glue
 import nominatim_api as napi
 import nominatim_api.logging as loglib
 
+from nominatim_api.localization import Locales
+from nominatim_api.transliterate import Transliterator
+
 
 # ASGIAdaptor.get_int/bool()
 
@@ -537,3 +540,17 @@ class TestSearchEndPointSearchCategory:
         res = await glue.search_endpoint(napi.NominatimAPIAsync(), a)
 
         assert len(json.loads(res.output)) == 1
+
+def test_get_locales_simple():
+    """Test that get_locales returns Locales when use_complex is False."""
+    accepted_languages = "en,fr"
+    locales = glue.get_locales(accepted_languages, use_complex=False)
+    assert isinstance(locales, Locales)
+    assert locales.languages == ["en", "fr"]
+
+def test_get_locales_complex():
+    """Test that get_locales returns Transliterator when use_complex is True."""
+    accepted_languages = "en,fr"
+    locales = glue.get_locales(accepted_languages, use_complex=True)
+    assert isinstance(locales, Transliterator)
+    assert locales.languages == ["en", "fr"]
