@@ -314,6 +314,7 @@ class BaseResult:
     admin_level: int = 15
 
     locale_name: Optional[str] = None
+    locale_name_lang: Optional[str] = None
     display_name: Optional[str] = None
     transliterated_name: Optional[str] = None
 

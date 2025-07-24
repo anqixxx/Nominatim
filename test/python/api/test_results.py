@@ -127,6 +127,7 @@ def test_transliterate():
         address_rows=address_lines,
         country_code="cn"
     )
+
     transliterator = Transliterator.from_accept_languages("en-US")
     result.transliterate(transliterator)
 

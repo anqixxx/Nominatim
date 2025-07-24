@@ -541,6 +541,7 @@ class TestSearchEndPointSearchCategory:
 
         assert len(json.loads(res.output)) == 1
 
+
 def test_get_locales_simple():
     """Test that get_locales returns Locales when use_complex is False."""
     accepted_languages = "en,fr"
